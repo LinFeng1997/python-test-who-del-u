@@ -14,12 +14,16 @@ import subprocess
 import ssl
 import threading
 
+#貌似原文没加
+from urllib import quote_plus
+
 DEBUG = False
 
 MAX_GROUP_NUM = 2  # 每组人数
 INTERFACE_CALLING_INTERVAL = 5  # 接口调用时间间隔, 间隔太短容易出现"操作太频繁", 会被限制操作半小时左右
 MAX_PROGRESS_LEN = 50
 
+#help(os.getcwd) Return a string representing the current working directory
 QRImagePath = os.path.join(os.getcwd(), 'qrcode.jpg')
 
 tip = 0
@@ -60,7 +64,7 @@ def responseState(func, BaseResponse):
 
     return True
 
-
+#得到微信的用户表示uuid
 def getUUID():
     global uuid
 
@@ -107,10 +111,15 @@ def showQRImage():
     f = open(QRImagePath, 'wb')
     f.write(r.content)
     f.close()
+
     time.sleep(1)
 
+    #调用shell打开一张图片
+    # os.system('open ' + QRImagePath)
+
+    #Darwin是由苹果电脑于2000年所释出的一个开放原始码操作系统
     if sys.platform.find('darwin') >= 0:
-        subprocess.call(['open', QRImagePath])
+        subprocess.call(['open', QRImagePath])  #mac下走这
     elif sys.platform.find('linux') >= 0:
         subprocess.call(['xdg-open', QRImagePath])
     else:
@@ -162,7 +171,10 @@ def waitForLogin():
                 push_uri = 'https://%s/cgi-bin/mmwebwx-bin' % pushUrl
                 break
 
-        # closeQRImage
+        '''
+        closeQRImage
+        登录成功，关闭二维码窗口
+        '''
         if sys.platform.find('darwin') >= 0:  # for OSX with Preview
             os.system("osascript -e 'quit app \"Preview\"'")
     elif code == '408':  # 超时
@@ -197,6 +209,7 @@ def login():
     # print('skey: %s, wxsid: %s, wxuin: %s, pass_ticket: %s' % (skey, wxsid,
     # wxuin, pass_ticket))
 
+    #迭代一遍，所有字段bool(value)都检查合格，那么才验证通过
     if not all((skey, wxsid, wxuin, pass_ticket)):
         return False
 
@@ -265,6 +278,8 @@ def webwxgetcontact():
                     "meishiapp", "feedsapp", "voip", "blogappweixin", "weixin", "brandsessionholder", "weixinreminder",
                     "wxid_novlwrv3lqwv11", "gh_22b87fa7cb3c", "officialaccounts", "notification_messages", "wxitil",
                     "userexperience_alarm"]
+
+    #先遍历一遍，把不需要处理的账号清除掉
     for i in range(len(MemberList) - 1, -1, -1):
         Member = MemberList[i]
         if Member['VerifyFlag'] & 8 != 0:  # 公众号/服务号
@@ -314,7 +329,7 @@ def createChatroom(UserNames):
 
     return ChatRoomName, DeletedList, BlockedList
 
-
+#删除成员
 def deleteMember(ChatRoomName, UserNames):
     url = (base_uri +
            '/webwxupdatechatroom?fun=delmember&pass_ticket=%s' % (pass_ticket))
@@ -336,7 +351,7 @@ def deleteMember(ChatRoomName, UserNames):
     state = responseState('deleteMember', dic['BaseResponse'])
     return state
 
-
+#添加成员
 def addMember(ChatRoomName, UserNames):
     url = (base_uri +
            '/webwxupdatechatroom?fun=addmember&pass_ticket=%s' % (pass_ticket))
@@ -426,7 +441,7 @@ def webwxsync():
     state = responseState('webwxsync', dic['BaseResponse'])
     return state
 
-
+#开启线程进行同步检测
 def heartBeatLoop():
     while True:
         selector = syncCheck()
@@ -437,7 +452,6 @@ def heartBeatLoop():
 
 # windows下编码问题修复
 # http://blog.csdn.net/heyuxuanzee/article/details/8442718
-
 class UnicodeStreamFilter:
     def __init__(self, target):
         self.target = target
@@ -455,8 +469,13 @@ class UnicodeStreamFilter:
         self.target.write(s)
 
 def main():
+    #定义一个全局变量,让后续的函数都知道这个全局变量
     global myRequests
 
+    '''
+    <module 'ssl' from '/System/Library/Frameworks/Python.framework/Versions/2.7/lib/python2.7/ssl.pyc'>
+    因此python也有lua中哪种判断一个类是否有某个方法的办法
+    '''
     if hasattr(ssl, '_create_unverified_context'):
         ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -465,16 +484,20 @@ def main():
     myRequests = requests.Session()
     myRequests.headers.update(headers)
 
+    #获取用户唯一标示
     if not getUUID():
         print('获取uuid失败')
         return
 
+    #生成二维码
     print('正在获取二维码图片...')
     showQRImage()
+
 
     while waitForLogin() != '200':
         pass
 
+    #登录成功后，删除本地的二维码图片
     os.remove(QRImagePath)
 
     if not login():
@@ -557,7 +580,7 @@ def main():
         print("无")
     print('---------------------------------------------')
 
-
+#macosx pycharm  'UTF-8'
 if sys.stdout.encoding == 'cp936':
     sys.stdout = UnicodeStreamFilter(sys.stdout)
 
